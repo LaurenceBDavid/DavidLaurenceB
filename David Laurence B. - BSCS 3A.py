@@ -292,9 +292,15 @@ def main():
         print("6. Priority with RR")
         print("7. Exit")
 
+        
+
         ch = input("Choice: ")
         if ch == '7':
             break
+        
+        if ch not in ['1','2','3','4','5','6','7']:
+                print("Invalid menu choice.")
+                continue
 
         n = int(input("Number of processes: "))
         processes = []
