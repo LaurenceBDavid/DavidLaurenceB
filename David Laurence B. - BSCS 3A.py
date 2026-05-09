@@ -17,7 +17,7 @@ class Process:
         self.tat = 0
 
 
-# Utilities
+# ================= UTILITIES ================= #
 
 def compute_metrics(p):
     p.tat = p.finish_time - p.arrival
@@ -57,7 +57,7 @@ def add_gantt(gantt, pid, start, end):
         gantt.append((pid, start, end))
 
 
-#  FCFS 
+# ================= FCFS ================= #
 
 def fcfs(processes):
     procs = sorted(clone_processes(processes), key=lambda x: (x.arrival, x.pid))
@@ -79,7 +79,7 @@ def fcfs(processes):
     print_metrics(procs)
 
 
-# SJF (Non-preemptive) 
+# ================= SJF ================= #
 
 def sjf(processes):
     procs = clone_processes(processes)
@@ -108,7 +108,7 @@ def sjf(processes):
     print_metrics(procs)
 
 
-# SRT (Preemptive) 
+# ================= SRT ================= #
 
 def srt(processes):
     procs = clone_processes(processes)
@@ -123,11 +123,10 @@ def srt(processes):
         ready = [p for p in procs if p.arrival <= time and p.rem > 0]
 
         if not ready:
-            if current != "IDLE":
-                if current is not None:
-                    add_gantt(gantt, current.pid, start, time)
-                start = time
-                current = "IDLE"
+            if current is not None:
+                add_gantt(gantt, current.pid if current != "IDLE" else "IDLE", start, time)
+            current = "IDLE"
+            start = time
             time += 1
             continue
 
@@ -136,8 +135,8 @@ def srt(processes):
         if current != p:
             if current is not None:
                 add_gantt(gantt, current.pid if current != "IDLE" else "IDLE", start, time)
-            start = time
             current = p
+            start = time
 
         p.rem -= 1
         time += 1
@@ -154,7 +153,7 @@ def srt(processes):
     print_metrics(procs)
 
 
-#  Round Robin
+# ================= ROUND ROBIN ================= #
 
 def round_robin(processes, tq):
     procs = sorted(clone_processes(processes), key=lambda x: (x.arrival, x.pid))
@@ -171,9 +170,8 @@ def round_robin(processes, tq):
             i += 1
 
         if not queue:
-            next_arrival = procs[i].arrival
-            add_gantt(gantt, "IDLE", time, next_arrival)
-            time = next_arrival
+            add_gantt(gantt, "IDLE", time, procs[i].arrival)
+            time = procs[i].arrival
             continue
 
         p = queue.popleft()
@@ -199,9 +197,9 @@ def round_robin(processes, tq):
     print_metrics(procs)
 
 
-# Priority (Non-preemptive) 
+# ================= PRIORITY NON-PREEMPTIVE ================= #
 
-def priority_np(processes):
+def priority_np(processes, mode):
     procs = clone_processes(processes)
     time = 0
     done = 0
@@ -216,7 +214,11 @@ def priority_np(processes):
             time = next_arrival
             continue
 
-        p = min(ready, key=lambda x: (x.priority, x.arrival, x.pid))
+        if mode == '2':  # higher number = higher priority
+            p = max(ready, key=lambda x: (x.priority, -x.arrival, -int(x.pid[1:])))
+        else:  # lower number = higher priority
+            p = min(ready, key=lambda x: (x.priority, x.arrival, x.pid))
+
         start = time
         time += p.burst
         p.finish_time = time
@@ -228,9 +230,9 @@ def priority_np(processes):
     print_metrics(procs)
 
 
-# Priority + Round Robin 
+# ================= PRIORITY + RR ================= #
 
-def priority_rr(processes, tq):
+def priority_rr(processes, tq, mode):
     procs = sorted(clone_processes(processes), key=lambda x: (x.arrival, x.pid))
     time = 0
     i = 0
@@ -239,21 +241,25 @@ def priority_rr(processes, tq):
     queues = {}
     gantt = []
 
+    def get_highest_priority(active):
+        if mode == '2':
+            return max(active)
+        return min(active)
+
     while done < len(procs):
         while i < len(procs) and procs[i].arrival <= time:
             p = procs[i]
             queues.setdefault(p.priority, deque()).append(p)
             i += 1
 
-        active_priorities = [pri for pri in queues if queues[pri]]
+        active = [k for k in queues if queues[k]]
 
-        if not active_priorities:
-            next_arrival = procs[i].arrival
-            add_gantt(gantt, "IDLE", time, next_arrival)
-            time = next_arrival
+        if not active:
+            add_gantt(gantt, "IDLE", time, procs[i].arrival)
+            time = procs[i].arrival
             continue
 
-        highest = min(active_priorities)
+        highest = get_highest_priority(active)
         queue = queues[highest]
         p = queue.popleft()
 
@@ -279,7 +285,7 @@ def priority_rr(processes, tq):
     print_metrics(procs)
 
 
-#  MAIN 
+# ================= MAIN ================= #
 
 def main():
     while True:
@@ -305,13 +311,22 @@ def main():
         n = int(input("Number of processes: "))
         processes = []
 
+        priority_mode = None
+        if ch in ['5', '6']:
+            print("\nPriority Rule:")
+            print("1. Lower number = higher priority")
+            print("2. Higher number = higher priority")
+            priority_mode = input("Choose mode (1 or 2): ")
+
         for i in range(n):
             pid = f"P{i+1}"
             arr = int(input(f"Arrival for {pid}: "))
             burst = int(input(f"Burst for {pid}: "))
             pri = 0
+
             if ch in ['5', '6']:
                 pri = int(input(f"Priority for {pid}: "))
+
             processes.append(Process(pid, arr, burst, pri))
 
         if ch == '1':
@@ -324,13 +339,11 @@ def main():
             tq = int(input("Time Quantum: "))
             round_robin(processes, tq)
         elif ch == '5':
-            priority_np(processes)
+            priority_np(processes, priority_mode)
         elif ch == '6':
             tq = int(input("Time Quantum: "))
-            priority_rr(processes, tq)
+            priority_rr(processes, tq, priority_mode)
 
 
 if __name__ == "__main__":
     main()
-
-    #LAURENCE B. DAVID BSCS 3A.
